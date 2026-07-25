@@ -1,0 +1,14 @@
+Tambahkan/ubah ini di file .env kamu. Jangan hapus DISCORD_TOKEN yang sudah ada.
+
+GEMINI_API_KEY=ISI_API_KEY_GEMINI_KAMU
+GEMINI_CHAT_MODEL=gemini-2.5-flash
+GEMINI_AUDIO_MODEL=gemini-2.5-flash
+GEMINI_TTS_MODEL=gemini-2.5-flash-preview-tts
+GEMINI_TTS_VOICE=Charon
+GEMINI_TIMEOUT_SECONDS=25
+
+# Yang OpenAI boleh dihapus / dibiarkan, sudah tidak dipakai:
+# OPENAI_API_KEY=
+# OPENAI_CHAT_MODEL=
+# OPENAI_STT_MODEL=
+# OPENAI_TTS_MODEL=
