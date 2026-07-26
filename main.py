@@ -1472,40 +1472,7 @@ async def dm_command(
     await send_dm_command_impl(interaction, user_id=user_id, isi_pesan=isi_pesan, gambar=gambar)
 
 
-@bot.tree.command(name="kirimdm", description="Kirim DM ke user ID. Versi cepat dari /kirim dm.")
-@app_commands.describe(
-    user_id="ID user target, contoh 123456789012345678 atau mention user",
-    isi_pesan="Isi pesan yang akan dikirim ke DM target",
-    gambar="Opsional: gambar yang ikut dikirim ke DM",
-)
-async def kirimdm_command(
-    interaction: discord.Interaction,
-    user_id: str,
-    isi_pesan: str,
-    gambar: discord.Attachment | None = None,
-) -> None:
-    await send_dm_command_impl(interaction, user_id=user_id, isi_pesan=isi_pesan, gambar=gambar)
-
-
-kirim_group = app_commands.Group(name="kirim", description="Command kirim pesan dari GLADIATOR.")
-
-
-@kirim_group.command(name="dm", description="Kirim DM ke user ID. Bisa sekalian upload gambar.")
-@app_commands.describe(
-    user_id="ID user target, contoh 123456789012345678 atau mention user",
-    isi_pesan="Isi pesan yang akan dikirim ke DM target",
-    gambar="Opsional: gambar yang ikut dikirim ke DM",
-)
-async def kirim_dm_command(
-    interaction: discord.Interaction,
-    user_id: str,
-    isi_pesan: str,
-    gambar: discord.Attachment | None = None,
-) -> None:
-    await send_dm_command_impl(interaction, user_id=user_id, isi_pesan=isi_pesan, gambar=gambar)
-
-
-bot.tree.add_command(kirim_group)
+# /kirimdm dan /kirim group dihapus karena duplikat dari /dm
 
 
 # =====================================
