@@ -102,6 +102,9 @@ class Settings:
     moderation_ban_crypto_scams: bool
     moderation_ban_dm_warnings: bool
     moderation_image_max_bytes: int
+    mrbeast_scam_detection: bool
+    mrbeast_scam_ban: bool
+    celebrity_scam_detection: bool
 
 
 def load_settings() -> Settings:
@@ -139,7 +142,7 @@ def load_settings() -> Settings:
         bot_prefix=os.getenv("BOT_PREFIX", "!").strip() or "!",
         bot_name=bot_name,
         bot_creator_name=os.getenv("BOT_CREATOR_NAME", "Aagga").strip() or "Aagga",
-        bot_role_description=os.getenv("BOT_ROLE_DESCRIPTION", "assistant guard server AI").strip() or "assistant guard server AI",
+        bot_role_description=os.getenv("BOT_ROLE_DESCRIPTION", "asisten AI yang bijaksana, tegas dalam menegakkan aturan, dan setia kepada pemiliknya").strip() or "asisten AI yang bijaksana, tegas dalam menegakkan aturan, dan setia kepada pemiliknya",
         bot_language=os.getenv("BOT_LANGUAGE", "id").strip() or "id",
         gemini_chat_model=os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash",
         gemini_audio_model=os.getenv("GEMINI_AUDIO_MODEL", "gemini-2.5-flash").strip() or "gemini-2.5-flash",
@@ -194,4 +197,8 @@ def load_settings() -> Settings:
         moderation_ban_crypto_scams=_get_bool("MODERATION_BAN_CRYPTO_SCAMS", True),
         moderation_ban_dm_warnings=_get_bool("MODERATION_BAN_DM_WARNINGS", True),
         moderation_image_max_bytes=_get_int("MODERATION_IMAGE_MAX_BYTES", 4_000_000),
+        # Mr. Beast / Celebrity scam detection (marak 2026)
+        mrbeast_scam_detection=_get_bool("MRBEAST_SCAM_DETECTION", True),
+        mrbeast_scam_ban=_get_bool("MRBEAST_SCAM_BAN", True),
+        celebrity_scam_detection=_get_bool("CELEBRITY_SCAM_DETECTION", True),
     )

@@ -57,7 +57,7 @@ intents.message_content = True  # Enable this in Discord Developer Portal for me
 intents.members = True  # Enable Server Members Intent in Developer Portal for accurate admin/member data.
 
 last_text_request_at: dict[int, float] = {}
-BOT_PATCH_VERSION = "slash-command-cleaner-v10"
+BOT_PATCH_VERSION = "mrbeast-robux-promo-guard-v2"
 
 # Kalau Discord API sedang global-rate-limit, jangan paksa kirim response/log/DM.
 # Memaksa kirim saat 429 justru bikin error berantai dan bot terlihat crash.
@@ -281,8 +281,80 @@ async def send_mod_dm(message: discord.Message, result: ModerationResult) -> Non
         return
     _last_mod_dm_at[key] = now
 
-    try:
-        await message.author.send(
+    # Cek jenis pelanggaran untuk DM peringatan khusus
+    category = (result.category or "").lower()
+    is_mrbeast_scam = "mrbeast" in category
+    is_celebrity_scam = "celebrity" in category
+    is_crypto_scam = "crypto" in category or "scam" in category
+    is_robux_scam = "robux" in category
+    is_server_promo = "server-promotion" in category
+
+    if is_robux_scam:
+        # DM peringatan khusus Robux scam
+        dm_message = (
+            "\u26a0\ufe0f **PERINGATAN SCAM ROBUX!** \u26a0\ufe0f\n\n"
+            "Pesan kamu di server **{guild}** telah dihapus oleh **GLADIATOR Guard System**.\n"
+            "Channel: #{channel}\n"
+            "Alasan: **{reason}**\n\n"
+            "\U0001f6a8 **INI SCAM!** Tidak ada yang namanya \"Free Robux\" atau \"Robux Generator\".\n\n"
+            "Scam Robux ini adalah propaganda palsu untuk mencuri akun Roblox/Roblox.\n"
+            "Jika kamu tidak sengaja mengirim ini:\n"
+            "1\ufe0f\u20e3 **Jangan klik link** \"free robux\" apapun\n"
+            "2\ufe0f\u20e3 **Ganti password** Roblox dan Discord kamu\n"
+            "3\ufe0f\u20e3 **Jangan bagikan kredensial** login ke siapapun\n"
+            "4\ufe0f\u20e3 **Aktifkan 2FA** di Roblox dan Discord\n\n"
+            "\U0001f534 Pelanggaran berulang akan menyebabkan **BAN PERMANEN** dari server.\n"
+            "Hubungi admin jika kamu merasa ini kesalahan."
+            .format(
+                guild=message.guild.name if message.guild else "server",
+                channel=getattr(message.channel, "name", "unknown"),
+                reason=result.reason,
+            )
+        )
+    elif is_server_promo:
+        # DM peringatan khusus promosi server
+        dm_message = (
+            "\u26a0\ufe0f **PERINGATAN PROMOSI SERVER!** \u26a0\ufe0f\n\n"
+            "Pesan kamu di server **{guild}** telah dihapus oleh **GLADIATOR Guard System**.\n"
+            "Channel: #{channel}\n"
+            "Alasan: **{reason}**\n\n"
+            "\U0001f6ab **Dilarang keras mempromosikan server Discord lain** di server ini.\n\n"
+            "Promosi server Discord lain melanggar aturan server dan mengganggu kenyamanan member.\n"
+            "\U0001f534 Pelanggaran berulang akan menyebabkan **BAN PERMANEN** dari server.\n"
+            "Hubungi admin jika kamu ingin kerja sama server yang sah."
+            .format(
+                guild=message.guild.name if message.guild else "server",
+                channel=getattr(message.channel, "name", "unknown"),
+                reason=result.reason,
+            )
+        )
+    elif is_mrbeast_scam or is_celebrity_scam or is_crypto_scam:
+        # DM peringatan tegas untuk scam
+        scam_type = "Mr. Beast" if is_mrbeast_scam else "selebriti" if is_celebrity_scam else "crypto/scam"
+        dm_message = (
+            "🚨 **PERINGATAN SCAM!** 🚨\n\n"
+            "Pesan kamu di server **{guild}** telah dihapus oleh **GLADIATOR Guard System**.\n"
+            "Channel: #{channel}\n"
+            "Alasan: **{reason}**\n\n"
+            "⚠️ **Akun kamu mungkin sedang diretas/dipakai untuk menyebarkan scam {scam_type}!**\n\n"
+            "Scam ini mengatasnamakan figur publik terkenal untuk menipu orang lain. "
+            "Jika kamu tidak sengaja mengirim ini, segera:\n"
+            "1️⃣ **Ganti password Discord kamu** dari perangkat yang bersih\n"
+            "2️⃣ Cek **Authorized Apps** Discord ➜ Cabut aplikasi mencurigakan\n"
+            "3️⃣ **Scan komputer kamu** dengan antivirus untuk infostealer/malware\n"
+            "4️⃣ **Log out dari semua perangkat** di pengaturan Discord\n"
+            "5️⃣ **Aktifkan 2FA/Authenticator** jika belum\n\n"
+            "🔴 Akun yang menyebarkan scam ini bisa di-ban dari server.\n"
+            "Kalau kamu merasa ini kesalahan, segera hubungi admin/moderator server."
+            .format(
+                guild=message.guild.name if message.guild else "server",
+                channel=getattr(message.channel, "name", "unknown"),
+                reason=result.reason,
+                scam_type=scam_type,
+            )
+        )
+    else:
+        dm_message = (
             "⚠️ Pesan kamu di server **{guild}** telah dihapus oleh sistem guard.\n"
             "Channel: #{channel}\n"
             "Alasan: **{reason}**\n\n"
@@ -293,6 +365,9 @@ async def send_mod_dm(message: discord.Message, result: ModerationResult) -> Non
                 reason=result.reason,
             )
         )
+
+    try:
+        await message.author.send(dm_message)
     except discord.Forbidden:
         pass
     except discord.HTTPException as exc:
@@ -463,6 +538,14 @@ async def handle_auto_moderation(message: discord.Message) -> bool:
 
     mention_count = len(message.mentions) + len(message.role_mentions)
 
+    # Deteksi attachment gambar untuk rule-based check
+    has_image = False
+    image_count = 0
+    if message.attachments:
+        image_count = sum(1 for att in message.attachments if attachment_is_image(att))
+        if image_count > 0:
+            has_image = True
+
     result = spam_tracker.check(
         guild_id=message.guild.id,
         user_id=message.author.id,
@@ -479,6 +562,8 @@ async def handle_auto_moderation(message: discord.Message) -> bool:
             max_mentions=settings.mod_max_mentions,
             allowed_domains=settings.mod_allowed_link_domains,
             delete_links=settings.moderation_delete_links,
+            has_image=has_image,
+            image_count=image_count,
         )
 
     # Pakai AI hanya untuk pesan yang mencurigakan tapi belum ketangkap rule-based.
@@ -840,11 +925,15 @@ def looks_like_identity_question(text: str) -> bool:
 def identity_answer() -> str:
     name = settings.bot_name or "GLADIATOR"
     creator = settings.bot_creator_name or "Aagga"
-    role = settings.bot_role_description or "assistant guard server AI"
+    role = settings.bot_role_description or "asisten AI yang bijaksana, tegas dalam menegakkan aturan, dan setia kepada pemiliknya"
     return (
-        f"Aku **{name}**, {role} di server Discord ini. "
-        f"Aku dibuat oleh **{creator}**. Tugasku membantu jawab pertanyaan, membaca info server, "
-        "membantu guard/moderasi, dan mendukung command voice seperti `/talk`, `/say`, dan `/saypremium`."
+        f"Aku **{name}**, {role}. "
+        f"Aku diciptakan oleh **{creator}**, pemilik dan tuan yang aku hormati. "
+        "Tugasku adalah menjaga ketertiban server, menjawab pertanyaan dengan bijaksana, "
+        "menegakkan aturan dengan tegas dan adil, serta melindungi server dari berbagai ancaman seperti scam, spam, dan promosi ilegal. "
+        "Aku tidak segan memberikan peringatan keras kepada pelanggar, "
+        "namun aku selalu bersikap hormat kepada pemilik server dan admin yang sah. "
+        "Jika ada yang melanggar aturan, aku akan bertindak."
     )
 
 
@@ -1383,46 +1472,375 @@ async def dm_command(
     await send_dm_command_impl(interaction, user_id=user_id, isi_pesan=isi_pesan, gambar=gambar)
 
 
-@bot.tree.command(name="kirimdm", description="Kirim DM ke user ID. Versi cepat dari /kirim dm.")
+# /kirimdm dan /kirim group dihapus karena duplikat dari /dm
+
+
+# =====================================
+# Scam Warning / Block Commands
+# =====================================
+
+@bot.tree.command(name="mrbeastblock", description="Kirim peringatan DM scam Mr. Beast ke user.")
 @app_commands.describe(
-    user_id="ID user target, contoh 123456789012345678 atau mention user",
-    isi_pesan="Isi pesan yang akan dikirim ke DM target",
-    gambar="Opsional: gambar yang ikut dikirim ke DM",
+    user_id="ID user yang menyebarkan scam Mr. Beast",
+    alasan="Alasan peringatan",
 )
-async def kirimdm_command(
+async def mrbeastblock(
     interaction: discord.Interaction,
     user_id: str,
-    isi_pesan: str,
-    gambar: discord.Attachment | None = None,
+    alasan: str = "Menyebarkan scam palsu mengatasnamakan Mr. Beast",
 ) -> None:
-    await send_dm_command_impl(interaction, user_id=user_id, isi_pesan=isi_pesan, gambar=gambar)
+    if not await require_bot_admin(interaction, action="memblokir scam Mr. Beast"):
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    target_id = parse_discord_user_id(user_id)
+    if target_id is None:
+        await interaction.followup.send("User ID tidak valid.", ephemeral=True)
+        return
+
+    target = None
+    if interaction.guild:
+        target = interaction.guild.get_member(target_id)
+    if target is None:
+        try:
+            target = await bot.fetch_user(target_id)
+        except discord.NotFound:
+            await interaction.followup.send("User tidak ditemukan.", ephemeral=True)
+            return
+        except discord.HTTPException as exc:
+            if _is_discord_global_429(exc):
+                wait = _mark_discord_api_pause(exc)
+                await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+                return
+            await interaction.followup.send(f"Gagal cari user: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+            return
+
+    target_label = str(target)
+    guild_name = interaction.guild.name if interaction.guild else "Discord"
+
+    dm_message = (
+        "**PERINGATAN RESMI DARI GLADIATOR GUARD**\n\n"
+        "Akun kamu terdeteksi menyebarkan **SCAM MR. BEAST** di server **{guild}**.\n\n"
+        "Akun kamu mengirim pesan/gambar palsu yang mengatasnamakan Mr. Beast "
+        "(giveaway/crypto/casino palsu) untuk menipu anggota server lain.\n\n"
+        "AKUN KAMU MUNGKIN SUDAH DIRETAS! "
+        "Scam Mr. Beast biasanya menyebar melalui akun yang dicuri.\n\n"
+        "1. Ganti password Discord dari perangkat BERSIH\n"
+        "2. Scan komputer dengan antivirus\n"
+        "3. Cek Authorized Apps Discord, cabut aplikasi mencurigakan\n"
+        "4. Log out dari semua perangkat\n"
+        "5. Aktifkan 2FA jika belum\n\n"
+        "Alasan: {reason}\n\n"
+        "Hubungi admin server jika kamu merasa ini kesalahan."
+        .format(
+            guild=guild_name,
+            reason=alasan,
+        )
+    )
+
+    try:
+        await target.send(dm_message, allowed_mentions=discord.AllowedMentions.none())
+    except discord.Forbidden:
+        await interaction.followup.send(f"DM tidak terkirim ke **{target_label}** - DM tertutup.", ephemeral=True)
+        return
+    except discord.HTTPException as exc:
+        if _is_discord_global_429(exc):
+            wait = _mark_discord_api_pause(exc)
+            await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+            return
+        await interaction.followup.send(f"Gagal kirim DM: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+        return
+    except Exception as exc:
+        await interaction.followup.send(f"Gagal kirim DM: {type(exc).__name__}: {exc}", ephemeral=True)
+        return
+
+    await log_direct_dm_action(
+        interaction, target_id=target_id, target_label=target_label,
+        ok=True, reason=f"MRBEAST WARNING: {alasan[:200]}", has_image=False,
+    )
+    await interaction.followup.send(
+        f"Peringatan scam Mr. Beast terkirim ke **{target_label}** (`{target_id}`).",
+        ephemeral=True,
+    )
 
 
-kirim_group = app_commands.Group(name="kirim", description="Command kirim pesan dari GLADIATOR.")
-
-
-@kirim_group.command(name="dm", description="Kirim DM ke user ID. Bisa sekalian upload gambar.")
+@bot.tree.command(name="scamwarn", description="Kirim peringatan scam umum ke DM user.")
 @app_commands.describe(
-    user_id="ID user target, contoh 123456789012345678 atau mention user",
-    isi_pesan="Isi pesan yang akan dikirim ke DM target",
-    gambar="Opsional: gambar yang ikut dikirim ke DM",
+    user_id="ID user target",
+    jenis_scam="Jenis scam (mrbeast, crypto, celebrity, general)",
+    alasan="Alasan peringatan",
 )
-async def kirim_dm_command(
+@app_commands.choices(jenis_scam=[
+    app_commands.Choice(name="Mr. Beast Scam", value="mrbeast"),
+    app_commands.Choice(name="Crypto/Casino Scam", value="crypto"),
+    app_commands.Choice(name="Celebrity Scam", value="celebrity"),
+    app_commands.Choice(name="General Scam", value="general"),
+])
+async def scamwarn(
     interaction: discord.Interaction,
     user_id: str,
-    isi_pesan: str,
-    gambar: discord.Attachment | None = None,
+    jenis_scam: str = "general",
+    alasan: str = "Menyebarkan konten scam di server",
 ) -> None:
-    await send_dm_command_impl(interaction, user_id=user_id, isi_pesan=isi_pesan, gambar=gambar)
+    if not await require_bot_admin(interaction, action="mengirim peringatan scam"):
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    target_id = parse_discord_user_id(user_id)
+    if target_id is None:
+        await interaction.followup.send("User ID tidak valid.", ephemeral=True)
+        return
+
+    alasan = alasan.strip()[:1800]
+
+    target = None
+    if interaction.guild:
+        target = interaction.guild.get_member(target_id)
+    if target is None:
+        try:
+            target = await bot.fetch_user(target_id)
+        except discord.NotFound:
+            await interaction.followup.send("User tidak ditemukan.", ephemeral=True)
+            return
+        except discord.HTTPException as exc:
+            if _is_discord_global_429(exc):
+                wait = _mark_discord_api_pause(exc)
+                await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+                return
+            await interaction.followup.send(f"Gagal cari user: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+            return
+
+    target_label = str(target)
+    guild_name = interaction.guild.name if interaction.guild else "Discord"
+
+    templates = {
+        "mrbeast": "PERINGATAN SCAM MR. BEAST - Akun kamu di **{guild}** terdeteksi menyebarkan scam palsu yang mengatasnamakan Mr. Beast.",
+        "crypto": "PERINGATAN SCAM CRYPTO/CASINO - Akun kamu di **{guild}** terdeteksi menyebarkan promosi scam crypto, casino, atau withdrawal palsu.",
+        "celebrity": "PERINGATAN SCAM SELEBRITI - Akun kamu di **{guild}** terdeteksi menyebarkan scam yang mengatasnamakan figur publik.",
+        "general": "PERINGATAN SCAM DARI GLADIATOR GUARD - Akun kamu di **{guild}** terdeteksi menyebarkan konten scam.",
+    }
+
+    template = templates.get(jenis_scam, templates["general"])
+    dm_message = (
+        template.format(guild=guild_name)
+        + "\n\nAlasan: " + alasan
+        + "\n\nHubungi admin server jika kamu merasa ini kesalahan."
+    )
+
+    try:
+        await target.send(dm_message, allowed_mentions=discord.AllowedMentions.none())
+    except discord.Forbidden:
+        await interaction.followup.send(f"DM tidak terkirim ke **{target_label}** - DM tertutup.", ephemeral=True)
+        return
+    except discord.HTTPException as exc:
+        if _is_discord_global_429(exc):
+            wait = _mark_discord_api_pause(exc)
+            await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+            return
+        await interaction.followup.send(f"Gagal kirim DM: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+        return
+    except Exception as exc:
+        await interaction.followup.send(f"Gagal kirim DM: {type(exc).__name__}: {exc}", ephemeral=True)
+        return
+
+    await log_direct_dm_action(
+        interaction, target_id=target_id, target_label=target_label,
+        ok=True, reason=f"SCAMWARN ({jenis_scam}): {alasan[:200]}", has_image=False,
+    )
+    await interaction.followup.send(
+        f"Peringatan scam ({jenis_scam}) terkirim ke **{target_label}** (`{target_id}`).",
+        ephemeral=True,
+    )
 
 
-bot.tree.add_command(kirim_group)
+# =====================================
+# Send-to: Owner DM + file + AI compose
+# =====================================
 
+@bot.tree.command(name="sendto", description="[OWNER] Kirim DM + file ke user, bisa AI bantu compose pesan.")
+@app_commands.describe(
+    user_id="ID user target atau mention",
+    isi_pesan="Isi pesan (opsional jika pakai AI, wajib jika manual)",
+    file="File lampiran (gambar, audio, PDF, dokumen) maks 8MB",
+    bantuan_ai="True = AI bantu susun pesan dari instruksi",
+)
+@app_commands.choices(bantuan_ai=[
+    app_commands.Choice(name="Ya, AI bantu compose", value="true"),
+    app_commands.Choice(name="Tidak, kirim manual", value="false"),
+])
+async def sendto(
+    interaction: discord.Interaction,
+    user_id: str,
+    isi_pesan: str = "",
+    file: discord.Attachment | None = None,
+    bantuan_ai: str = "false",
+) -> None:
+    """Kirim DM dengan file attachment ke user. Bisa AI bantu compose pesan."""
+    if interaction.user.id not in settings.bot_owner_ids:
+        await interaction.response.send_message(
+            "Command /sendto hanya untuk Owner Bot di BOT_OWNER_IDS.\nPakai /dm untuk kirim DM biasa.",
+            ephemeral=True,
+        )
+        return
 
+    await interaction.response.defer(ephemeral=True, thinking=True)
+
+    target_id = parse_discord_user_id(user_id)
+    if target_id is None:
+        await interaction.followup.send("User ID tidak valid.", ephemeral=True)
+        return
+
+    target = None
+    if interaction.guild:
+        target = interaction.guild.get_member(target_id)
+    if target is None:
+        try:
+            target = await bot.fetch_user(target_id)
+        except discord.NotFound:
+            await interaction.followup.send("User tidak ditemukan.", ephemeral=True)
+            return
+        except discord.HTTPException as exc:
+            if _is_discord_global_429(exc):
+                wait = _mark_discord_api_pause(exc)
+                await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+                return
+            await interaction.followup.send(f"Gagal cari user: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+            return
+
+    target_label = str(target)
+
+    file_to_send: discord.File | None = None
+    has_file = file is not None
+    max_bytes = int(os.getenv("DM_IMAGE_MAX_BYTES", "8000000"))
+
+    if file is not None:
+        if file.size and file.size > max_bytes:
+            await interaction.followup.send(f"File terlalu besar. Maksimal {max_bytes // 1_000_000} MB.", ephemeral=True)
+            return
+        try:
+            try:
+                file_to_send = await file.to_file(use_cached=True)
+            except TypeError:
+                file_to_send = await file.to_file()
+        except discord.HTTPException as exc:
+            if _is_discord_global_429(exc):
+                wait = _mark_discord_api_pause(exc)
+                await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+                return
+            await interaction.followup.send(f"Gagal baca file: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.followup.send(f"Gagal proses file: {type(exc).__name__}: {exc}", ephemeral=True)
+            return
+
+    use_ai = bantuan_ai == "true"
+    user_prompt = (isi_pesan or "").strip()
+    final_message = ""
+    ai_generated = False
+
+    if use_ai:
+        if not user_prompt:
+            await interaction.followup.send(
+                "Kamu pilih AI, tapi isi_pesan kosong.\n"
+                "Tulis INSTRUKSI di isi_pesan, contoh: 'Beri peringatan spam' atau 'Buat pengumuman resmi'.",
+                ephemeral=True,
+            )
+            return
+
+        guild_name = interaction.guild.name if interaction.guild else "server Discord"
+        ai_prompt = (
+            f"Tujuan: {user_prompt}\n"
+            f"Pengirim: Staff server {guild_name}\n"
+            f"Nama staff: {interaction.user.display_name}\n"
+            f"Target: User Discord\n\n"
+            "Buat pesan DM sesuai tujuan. Bijaksana, tegas jika perlu, sopan, profesional."
+        )
+
+        try:
+            ai_text = await ai.compose_dm_message(ai_prompt)
+        except Exception as exc:
+            await interaction.followup.send(f"AI gagal: {friendly_ai_error(exc)}", ephemeral=True)
+            return
+
+        if not ai_text.strip():
+            await interaction.followup.send("AI tidak menghasilkan teks. Coba lagi.", ephemeral=True)
+            return
+
+        final_message = ai_text.strip()
+        ai_generated = True
+
+        preview = f"AI telah menyusun pesan:\n\n{final_message}\n\nFile: {'Ada' if has_file else 'Tidak'}\n\nKetik `kirim` untuk kirim, `batal` untuk batalkan. (30 detik)"
+        await interaction.followup.send(preview[:1900], ephemeral=True)
+
+        def check(msg):
+            return (
+                msg.author.id == interaction.user.id
+                and msg.channel.id == interaction.channel_id
+                and msg.content.strip().lower() in ("kirim", "batal")
+            )
+
+        try:
+            reply = await bot.wait_for("message", timeout=30.0, check=check)
+        except asyncio.TimeoutError:
+            await interaction.followup.send("Waktu habis. Ulangi perintah.", ephemeral=True)
+            return
+
+        if reply.content.strip().lower() == "batal":
+            await interaction.followup.send("Dibatalkan.", ephemeral=True)
+            return
+
+        await interaction.followup.send("Mengirim...", ephemeral=True)
+
+    else:
+        if not user_prompt:
+            await interaction.followup.send(
+                "isi_pesan tidak boleh kosong. Tulis pesan, atau aktifkan bantuan_ai.",
+                ephemeral=True,
+            )
+            return
+        final_message = user_prompt
+
+    if len(final_message) > 1900:
+        final_message = final_message[:1900] + "..."
+
+    guild_name = interaction.guild.name if interaction.guild else "Discord"
+    dm_text = f"Pesan dari staff server {guild_name}\n\n{final_message}"
+
+    try:
+        await target.send(content=dm_text, file=file_to_send, allowed_mentions=discord.AllowedMentions.none())
+    except discord.Forbidden:
+        await log_direct_dm_action(interaction, target_id=target_id, target_label=target_label, ok=False,
+            reason="DM tertutup", has_image=has_file)
+        await interaction.followup.send("DM tidak terkirim: DM target tertutup.", ephemeral=True)
+        return
+    except discord.HTTPException as exc:
+        if _is_discord_global_429(exc):
+            wait = _mark_discord_api_pause(exc)
+            await interaction.followup.send(f"Discord API rate-limit. Coba lagi {wait} detik.", ephemeral=True)
+            return
+        await interaction.followup.send(f"Gagal kirim DM: HTTP {getattr(exc, 'status', 'unknown')}.", ephemeral=True)
+        return
+    except Exception as exc:
+        await interaction.followup.send(f"Gagal kirim DM: {type(exc).__name__}: {exc}", ephemeral=True)
+        return
+
+    await log_direct_dm_action(
+        interaction, target_id=target_id, target_label=target_label,
+        ok=True, reason=f"SendTo {'AI' if ai_generated else 'manual'}", has_image=has_file,
+    )
+
+    await interaction.followup.send(
+        f"DM terkirim ke {target_label} ({target_id}) via {'AI' if ai_generated else 'manual'}."
+        + (" File terkirim." if has_file else ""),
+        ephemeral=True,
+    )
 
 
 # =========================
 # Slash command cleaner
+
 # =========================
 # Dipakai ketika command Discord dobel/kebanyakan karena pernah sync global + guild berkali-kali.
 # Command ini tetap dibatasi untuk owner/admin/role tinggi.
@@ -1685,7 +2103,13 @@ async def modstatus(interaction: discord.Interaction) -> None:
         f"Bypass roles: `{bypass}`\n"
         f"Spam limit: **{settings.mod_spam_message_limit} pesan/{settings.mod_spam_window_seconds} detik**\n"
         f"Duplicate limit: **{settings.mod_duplicate_message_limit}x pesan sama**\n"
-        f"Max mention: **{settings.mod_max_mentions}**"
+        f"Max mention: **{settings.mod_max_mentions}**\n\n"
+        "**Anti-Scam & Anti-Promosi 2026**\n"
+        f"Mr. Beast scam detect: **{settings.mrbeast_scam_detection}**\n"
+        f"Mr. Beast scam ban: **{settings.mrbeast_scam_ban}**\n"
+        f"Celebrity scam detect: **{settings.celebrity_scam_detection}**\n"
+        f"Robux scam detect: **Aktif**\n"
+        f"Server promo block: **Aktif**"
     )
     await interaction.followup.send(text, ephemeral=True)
 
@@ -1742,7 +2166,10 @@ def build_help_menu_text(*, is_admin: bool) -> str:
         "`/ragscan channel limit:` — scan isi channel untuk RAG.\n"
         "`/ragclear` — hapus database RAG lokal.\n"
         "`/ragstatus` — cek jumlah data RAG.\n"
-        "`/modstatus` — cek status auto-moderation.\n"
+        "`/modstatus` — cek status auto-moderation & anti-scam.\n"
+        "`/mrbeastblock user_id:` — kirim peringatan scam Mr. Beast ke DM.\n"
+        "`/scamwarn user_id:` — kirim peringatan scam umum ke DM.\n"
+        "`/sendto user_id:` — [OWNER] kirim DM + file, bisa AI compose pesan.\n"
         "`/resetvoice` — reset voice kalau stuck.\n"
         "`/stopvoice`, `/stoplisten`, `/stopspeak` — kontrol voice/audio.\n"
         "`/status` — cek status voice bot."
